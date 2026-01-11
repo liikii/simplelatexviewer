@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>simple latex viewer（KaTeX）</title>
+    <link rel="stylesheet" href="static/katex.min.css">
+    <script src="static/katex.min.js"></script>
+    <script src="static/auto-render.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Segoe UI", Arial, sans-serif;
+        }
+        html, body {
+            height: 100vh; /* 100vh = 视口高度的100%，比 100% 更稳定，避免父元素高度影响 */
+            overflow: hidden; /* 可选：隐藏页面整体滚动条，防止内容溢出时出现双重滚动 */
+        }
+
+        .container {
+            width: 100%;
+            min-height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            /*gap: 20px;*/
+        }
+        @media (max-width: 768px) {
+            .container {
+                gap: 15px;
+            }
+            .editor, .viewer {
+                padding: 10px;
+            }
+        }
+        .editor{
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 15px;
+        }
+
+        .viewer {
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 15px;
+            flex: 1; /* 核心属性：占据父容器（.container）内剩余的所有垂直空间 */
+            display: flex; /* 嵌套 Flex 布局：让 .viewer-content 充满 .viewer */
+            flex-direction: column; /* 垂直布局，让 .viewer-content 占满 .viewer 高度 */
+        }
+        h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        /* 新增：flex布局容器，实现textarea和button横向排列 */
+        .input-group {
+            display: flex; /* 核心：开启flex布局，子元素默认横向排列 */
+            gap: 10px; /* 可选：设置textarea和button之间的间距，比margin更规整 */
+            align-items: flex-start; /* 可选：顶部对齐，避免按钮垂直居中显得不协调 */
+        }
+        textarea {
+            /* 修改：移除width: 100%，改为flex: 1 让textarea占满剩余宽度 */
+            flex: 1; /* 核心：自动填充.input-group的剩余宽度，自适应布局 */
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            font-family: "Consolas", "Monaco", monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        /*.viewer-content {
+            height: 100%;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background-color: #fafafa;
+            font-size: 16px;
+            line-height: 2;
+            overflow-x: auto;
+        }*/
+        .viewer-content {
+            /* 核心修改4：让 .viewer-content 充满 .viewer 容器的剩余高度 */
+            height: 100%; /* 占满 .viewer 的高度（扣除 h3 的 margin 和 .viewer 的 padding） */
+            min-height: unset; /* 移除原来的 min-height: 300px，避免限制高度 */
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background-color: #fafafa;
+            font-size: 16px;
+            line-height: 2;
+            overflow: auto; /* 可选：内容溢出时，仅 .viewer-content 出现滚动条，保持页面整洁 */
+            /* 保留 overflow-x: auto; 如需单独控制水平滚动，可替换为 overflow: auto; */
+        }
+        
+        button {
+            /* 修改：移除margin-top: 10px，避免横向排列时顶部偏移 */
+            margin-top: 0;
+            padding: 8px 16px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            height: 40px; /* 可选：固定按钮高度，更美观 */
+            white-space: nowrap; /* 可选：防止按钮文字换行 */
+            align-self: flex-start; /* 可选：与textarea顶部对齐 */
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- LaTeX代码编辑区 -->
+        <div class="editor">
+            <h3>input latex code</h3>
+            <!-- 新增：用.input-group包裹textarea和button，实现横向排列 -->
+            <div class="input-group">
+                <textarea id="latexInput" placeholder="请输入LaTeX代码，例如：
+A\mathbf{x} = 
+\begin{bmatrix}
+1 & 0 & 0 \\
+-1 & 1 & 0 \\
+0 & -1 & 1
+\end{bmatrix}
+\begin{bmatrix}
+x_1 \\
+x_2 \\
+x_3
+\end{bmatrix}
+= \mathbf{b}">A\mathbf{x} = 
+\begin{bmatrix}
+1 & 0 & 0 \\
+-1 & 1 & 0 \\
+0 & -1 & 1
+\end{bmatrix}
+\begin{bmatrix}
+x_1 \\
+x_2 \\
+x_3
+\end{bmatrix}
+=
+\begin{bmatrix}
+x_1 \\
+x_2 - x_1 \\
+x_3 - x_2
+\end{bmatrix}
+=
+\begin{bmatrix}
+b_1 \\
+b_2 \\
+b_3
+\end{bmatrix}
+= \mathbf{b}</textarea>
+                <button onclick="renderLatex()">render</button>
+            </div>
+        </div>
+        <!-- LaTeX渲染查看区（移除多余的<br>标签，布局更规整） -->
+        <div class="viewer">
+            <h3>LaTeX viewer（KaTeX）</h3>
+            <div id="viewerContent" class="viewer-content">
+                <!-- KaTeX会在这里渲染内容 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.onload = renderLatex;
+
+        function renderLatex() {
+            const latexCode = document.getElementById('latexInput').value;
+            const viewer = document.getElementById('viewerContent');
+            
+            viewer.innerHTML = '';
+
+            try {
+                katex.render(
+                    latexCode,
+                    viewer,
+                    {
+                        displayMode: true,
+                        throwOnError: false,
+                        strict: 'ignore',
+                        output: 'html',
+                        trust: true
+                    }
+                );
+            } catch (e) {
+                viewer.innerHTML = `<p style="color: red; text-align: center;">渲染失败：${e.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
